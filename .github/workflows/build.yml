@@ -27,6 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk Ozo-Creative-Diary.apk
+          cp app/build/outputs/apk/full/release/app-full-release.apk Ozo-Creative-Diary.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk Ozo-Creative-Diary-Lite.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Ozo-Creative-Diary.apk --title "Ozo Creative Diary" --notes "Tap Ozo-Creative-Diary.apk to download, then open it to install."
+          gh release create latest Ozo-Creative-Diary.apk Ozo-Creative-Diary-Lite.apk --title "Ozo Creative Diary" --notes "Ozo-Creative-Diary.apk has the WhatsApp/Instagram inbox. Ozo-Creative-Diary-Lite.apk has everything except the inbox and installs without Play Protect warnings."

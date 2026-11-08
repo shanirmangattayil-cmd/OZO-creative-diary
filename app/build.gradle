@@ -28,6 +28,12 @@ android {
             signingConfig System.getenv('OZO_KEYSTORE') ? signingConfigs.release : signingConfigs.debug
         }
     }
+    flavorDimensions 'edition'
+    productFlavors {
+        full { dimension 'edition'; buildConfigField 'boolean', 'LITE', 'false' }
+        lite { dimension 'edition'; buildConfigField 'boolean', 'LITE', 'true' }
+    }
+    buildFeatures { buildConfig true }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 

@@ -349,6 +349,7 @@ const local={
 };
 function useLocal(note){store=local;state.items=local.load();state.ready=true;$('#sync').textContent=note||'Saved on this phone only';render()}
 const APP=!!window.OzoNative;
+const LITE=APP&&!!(window.OzoNative.isLite&&window.OzoNative.isLite());
 const PHONE=APP||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 if(APP){try{Object.defineProperty(navigator,'clipboard',{value:{writeText:t=>{OzoNative.copy(String(t));return Promise.resolve()}},configurable:true})}catch(_){}}
 /* ---------- app-only storage: items in localStorage, gallery in IndexedDB ---------- */
@@ -380,8 +381,8 @@ async function bootPhone(){
     async put(it){state.items=state.items.filter(x=>x.id!==it.id).concat([it]);render();try{await api('/api/items',{item:it})}catch(e){toast('Not saved. Is Termux running?')}},
     async del(id){state.items=state.items.filter(x=>x.id!==id);render();try{await api('/api/delete',{id})}catch(e){toast('Not deleted. Is Termux running?')}}
   };
-  state.ready=true;$('#sync').textContent='Saved on this phone · Inbox on';render();
-  pollInbox();setInterval(pollInbox,15000);
+  state.ready=true;$('#sync').textContent=LITE?'Saved on this phone':'Saved on this phone · Inbox on';render();
+  if(!LITE){pollInbox();setInterval(pollInbox,15000)}
 }
 /* ---------- inbox (phone version only) ---------- */
 let inbox={messages:[],ok:false,error:'',checked:0},inboxSig='';
@@ -559,7 +560,7 @@ function vHome(){
     '<button class="tile final" data-go="final"><h3><span class="dot"></span>Final</h3><span class="n">'+fin.length+'</span>'+tileList(fin)+'</button>'+
    '</div>'+
    '<div class="links">'+
-    (PHONE?(function(){const u=unread(),a=u.filter(isAlert).length;return '<button class="link" data-go="inbox"><span class="ic" style="color:#5fe08f">'+svg('inbox')+'</span><span class="body"><b>Inbox</b><small>'+(inbox.ok?(u.length?u.length+' new'+(a?' · '+a+' need attention':''):'All caught up'):esc(inbox.error||'Connecting…'))+'</small>'+(u.length?'<span class="appcounts">'+Object.keys(FAM).map(k=>{const n=u.filter(m=>appOf(m)[0]===k).length;return n?'<span style="color:'+FAMC[k]+'">'+svg(k,14)+n+'</span>':''}).join('')+'</span>':'')+'</span>'+(a?'<span class="badge red">'+a+'</span>':u.length?'<span class="badge">'+u.length+'</span>':'')+'<span class="chev">›</span></button>'})():'')+
+    (PHONE&&!LITE?(function(){const u=unread(),a=u.filter(isAlert).length;return '<button class="link" data-go="inbox"><span class="ic" style="color:#5fe08f">'+svg('inbox')+'</span><span class="body"><b>Inbox</b><small>'+(inbox.ok?(u.length?u.length+' new'+(a?' · '+a+' need attention':''):'All caught up'):esc(inbox.error||'Connecting…'))+'</small>'+(u.length?'<span class="appcounts">'+Object.keys(FAM).map(k=>{const n=u.filter(m=>appOf(m)[0]===k).length;return n?'<span style="color:'+FAMC[k]+'">'+svg(k,14)+n+'</span>':''}).join('')+'</span>':'')+'</span>'+(a?'<span class="badge red">'+a+'</span>':u.length?'<span class="badge">'+u.length+'</span>':'')+'<span class="chev">›</span></button>'})():'')+
     '<button class="link" data-go="clients"><span class="ic">'+svg('clients')+'</span><span class="body"><b>Clients</b><small>'+cs.length+' compan'+(cs.length===1?'y':'ies')+'</small></span>'+
       (cs.length?'<span class="faces">'+cs.slice(0,4).map(c=>'<span style="background:'+colorFor(c.title)+'">'+initial(c.title)+'</span>').join('')+'</span>':'')+'<span class="chev">›</span></button>'+
     (function(){const pd=pending(),lt=pd.filter(p=>p.due&&p.due<today()).length;return '<button class="link" data-go="payments"><span class="ic">'+svg('pay')+'</span><span class="body"><b>Payments</b><small>'+(pd.length?rs(total(pd))+' to collect'+(lt?' · '+lt+' overdue':''):'Nothing pending')+'</small></span><span class="chev">›</span></button>'})()+
@@ -668,6 +669,7 @@ function vPeople(){
    '<div style="height:10px"></div>'+(ps.length?'<div class="list">'+ps.map(p=>personRow(p)).join('')+'</div>':'<div class="empty">No contacts yet. Add the people you work with and their WhatsApp number.</div>');
 }
 function vInbox(){
+  if(LITE)return bar('Inbox')+'<div class="empty" style="margin-top:10px">The inbox is in the full edition of the app. This Lite edition has everything else.</div>';
   if(!PHONE)return bar('Inbox')+'<div class="empty" style="margin-top:10px">The inbox works in the phone version of the diary that runs in Termux.</div>';
   const f=state.inboxF||'unread', ap=state.inboxApp||'all';
   const all=inbox.messages.slice().reverse().filter(m=>ap==='all'||appOf(m)[0]===ap);
