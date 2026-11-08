@@ -5,6 +5,14 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -61,7 +69,10 @@ public class MainActivity extends Activity {
                 Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
                 i.setType("*/*");
-                i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+                String[] acc = p.getAcceptTypes();
+                boolean json = false;
+                if (acc != null) for (String a : acc) if (a != null && (a.contains("json") || a.endsWith(".json"))) json = true;
+                if (!json) i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
                 i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
                 try { startActivityForResult(Intent.createChooser(i, "Choose photos or videos"), PICK); }
                 catch (ActivityNotFoundException e) { pending = null; return false; }
@@ -125,6 +136,36 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void copy(String text) {
             runOnUiThread(() -> { ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE); if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Ozo", text)); });
+        }
+        /** Keeps a copy of all diary data in Download/Ozo Diary so it survives reinstalling the app. */
+        @JavascriptInterface public boolean saveBackup(String json) {
+            try {
+                byte[] data = json.getBytes(StandardCharsets.UTF_8);
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentResolver cr = getContentResolver();
+                    Uri coll = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+                    String rel = Environment.DIRECTORY_DOWNLOADS + "/Ozo Diary/";
+                    Uri target = null;
+                    try (Cursor c = cr.query(coll, new String[]{MediaStore.MediaColumns._ID},
+                            MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+                            new String[]{"ozo-diary-backup.json", rel}, null)) {
+                        if (c != null && c.moveToFirst()) target = Uri.withAppendedPath(coll, String.valueOf(c.getLong(0)));
+                    }
+                    if (target == null) {
+                        ContentValues v = new ContentValues();
+                        v.put(MediaStore.MediaColumns.DISPLAY_NAME, "ozo-diary-backup.json");
+                        v.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
+                        v.put(MediaStore.MediaColumns.RELATIVE_PATH, rel);
+                        target = cr.insert(coll, v);
+                    }
+                    if (target == null) return false;
+                    try (OutputStream o = cr.openOutputStream(target, "wt")) { o.write(data); }
+                    return true;
+                }
+                File d = new File(getExternalFilesDir(null), "backup"); d.mkdirs();
+                try (FileOutputStream o = new FileOutputStream(new File(d, "ozo-diary-backup.json"))) { o.write(data); }
+                return true;
+            } catch (Exception e) { return false; }
         }
         @JavascriptInterface public void open(String url) { runOnUiThread(() -> openExternal(url)); }
         @JavascriptInterface public void shareText(String text) {
