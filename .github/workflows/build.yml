@@ -1,0 +1,32 @@
+name: Build Ozo Creative Diary APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Restore signing key
+        env:
+          KEY_B64: ${{ secrets.OZO_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEY_B64" ]; then echo "$KEY_B64" | base64 -d > "$RUNNER_TEMP/ozo.jks"; echo "OZO_KEYSTORE=$RUNNER_TEMP/ozo.jks" >> "$GITHUB_ENV"; fi
+      - name: Build APK
+        env:
+          OZO_KEYSTORE_PASSWORD: ${{ secrets.OZO_KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease --no-daemon
+      - name: Publish download link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk Ozo-Creative-Diary.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Ozo-Creative-Diary.apk --title "Ozo Creative Diary" --notes "Tap Ozo-Creative-Diary.apk to download, then open it to install."
