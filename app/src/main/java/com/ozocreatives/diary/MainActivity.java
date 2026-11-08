@@ -128,6 +128,7 @@ public class MainActivity extends Activity {
 
     class Bridge {
         @JavascriptInterface public boolean isLite() { return BuildConfig.LITE; }
+        @JavascriptInterface public int versionCode() { return BuildConfig.VERSION_CODE; }
         @JavascriptInterface public String getInbox() { return InboxStore.load(MainActivity.this).toString(); }
         @JavascriptInterface public boolean hasAccess() { return MainActivity.this.hasAccess(); }
         @JavascriptInterface public void markRead(String json) { try { InboxStore.markRead(MainActivity.this, new JSONObject(json)); } catch (Exception ignored) { } }
