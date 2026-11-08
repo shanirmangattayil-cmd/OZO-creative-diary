@@ -368,6 +368,7 @@ async function checkUpdate(manual){
   }catch(e){upd={state:'error',latest:0,url:'',msg:manual?'Could not check for updates. Check your internet and try again.':''}}
   render();if(manual&&upd.state==='current')toast('You have the latest version');
 }
+const WEB=APP&&!!(window.OzoNative.isWeb&&window.OzoNative.isWeb());
 const LITE=APP&&!!(window.OzoNative.isLite&&window.OzoNative.isLite());
 const PHONE=APP||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 if(APP){try{Object.defineProperty(navigator,'clipboard',{value:{writeText:t=>{OzoNative.copy(String(t));return Promise.resolve()}},configurable:true})}catch(_){}}
@@ -498,7 +499,7 @@ const igHref=h=>{h=String(h||'').trim();if(!h)return'';if(/^https?:\/\//.test(h)
 const fbHref=h=>{h=String(h||'').trim();if(!h)return'';if(/^https?:\/\//.test(h))return h;h=h.replace(/^@/,'').replace(/^(www\.|m\.)?facebook\.com\//,'');return h?'https://www.facebook.com/'+h.split('/').map(encodeURIComponent).join('/'):''};
 const ytHref=h=>{h=String(h||'').trim();if(!h)return'';if(/^https?:\/\//.test(h))return h;h=h.replace(/^(www\.)?youtube\.com\//,'');if(!h.startsWith('@')&&!h.includes('/'))h='@'+h;return 'https://www.youtube.com/'+h.split('/').map(encodeURIComponent).join('/').replace('%40','@')};
 const socBtn=(href,cls,icon,label)=>href?'<a class="soc '+cls+'" href="'+esc(href)+'" target="_blank" rel="noopener">'+svg(icon,18)+label+'</a>':'';
-const waPref=()=>'<div class="wa-pref"><span>Open WhatsApp in</span>'+seg('wa',[['wa','WhatsApp'],['biz','Business']],waApp)+'</div>';
+const waPref=()=>WEB?'':'<div class="wa-pref"><span>Open WhatsApp in</span>'+seg('wa',[['wa','WhatsApp'],['biz','Business']],waApp)+'</div>';
 const people=()=>of('person').sort((a,b)=>a.title.localeCompare(b.title));
 function personRow(p,hideClient){
   return '<div class="person"><span class="av round" style="background:'+colorFor(p.title)+'">'+initial(p.title)+'</span><div class="body"><b>'+esc(p.title)+'</b><div class="meta">'+
@@ -741,7 +742,7 @@ function vDiary(){
 function tabOf(v){if(['payments','people','inbox','backup','gallery'].includes(v))return'home';if(v==='today'||v==='tomorrow'||v==='personal')return'tasks';if(v==='editing'||v==='final')return'edits';if(v.startsWith('client'))return'clients';return v}
 function render(){
   const cur=tabOf(state.view);
-  const ub=document.getElementById('updBtn');if(ub&&APP){ub.hidden=false;const vc=OzoNative.versionCode?OzoNative.versionCode():0;ub.textContent=upd.state==='checking'?'Checking…':upd.state==='available'?'Update to v'+upd.latest:'Check for updates · v'+vc;if(upd.state==='available')ub.dataset.update='1';else delete ub.dataset.update}
+  const ub=document.getElementById('updBtn');if(ub&&APP&&!WEB){ub.hidden=false;const vc=OzoNative.versionCode?OzoNative.versionCode():0;ub.textContent=upd.state==='checking'?'Checking…':upd.state==='available'?'Update to v'+upd.latest:'Check for updates · v'+vc;if(upd.state==='available')ub.dataset.update='1';else delete ub.dataset.update}
   if(upd.msg&&upd.state!=='checking'){const m=upd.msg;upd.msg='';setTimeout(()=>toast(m),50)}
   $('#tabs').innerHTML=TABS.map(([k,l])=>'<button data-tab="'+k+'"'+(k===cur?' aria-current="page"':'')+'>'+svg(k,22)+l+'</button>').join('');
   checkAlarms();
