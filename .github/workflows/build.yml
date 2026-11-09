@@ -20,16 +20,31 @@ jobs:
           KEY_B64: ${{ secrets.OZO_KEYSTORE_B64 }}
           KEY_PASS: ${{ secrets.OZO_KEYSTORE_PASSWORD }}
         run: |
-          if [ -z "$KEY_B64" ] || [ -z "$KEY_PASS" ]; then gradle compileLiteReleaseJavaWithJavac compileFullReleaseJavaWithJavac --no-daemon; echo "::error::Code compiles, but the signing key is missing. Add the OZO_KEYSTORE_B64 and OZO_KEYSTORE_PASSWORD secrets. No APK published."; exit 1; fi
+          if [ -z "$KEY_B64" ] || [ -z "$KEY_PASS" ]; then echo "SIGNED=0" >> "$GITHUB_ENV"; echo "No signing key here: building an unsigned APK to be signed by the owner."; exit 0; fi
+          echo "SIGNED=1" >> "$GITHUB_ENV"
           printf '%s' "$KEY_B64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/ozo.jks"
           echo "OZO_KEYSTORE=$RUNNER_TEMP/ozo.jks" >> "$GITHUB_ENV"
+      - name: Build unsigned APK (owner signs it)
+        if: env.SIGNED == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/full/release/app-full-release-unsigned.apk full-unsigned.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release-unsigned.apk lite-unsigned.apk
+          cp "$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)lib/apksigner.jar" apksigner.jar
+          echo ${{ github.run_number }} > run.txt
+          gh release delete unsigned --yes --cleanup-tag || true
+          gh release create unsigned full-unsigned.apk lite-unsigned.apk apksigner.jar run.txt --prerelease --title "Unsigned build ${{ github.run_number }}" --notes "Not for installing. Signed copies are published as the latest release."
       - name: Build APK
+        if: env.SIGNED == '1'
         env:
           OZO_KEYSTORE_PASSWORD: ${{ secrets.OZO_KEYSTORE_PASSWORD }}
         run: |
           export OZO_KEYSTORE_PASSWORD="$(printf '%s' "$OZO_KEYSTORE_PASSWORD" | tr -d ' \r\n')"
           gradle assembleRelease --no-daemon
       - name: Publish download link
+        if: env.SIGNED == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

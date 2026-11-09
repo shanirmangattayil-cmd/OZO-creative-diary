@@ -25,7 +25,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig System.getenv('OZO_KEYSTORE') ? signingConfigs.release : signingConfigs.debug
+            signingConfig System.getenv('OZO_KEYSTORE') ? signingConfigs.release : null
         }
     }
     flavorDimensions 'edition'
