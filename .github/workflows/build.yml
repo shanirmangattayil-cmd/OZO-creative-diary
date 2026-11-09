@@ -2,6 +2,7 @@ name: Build Ozo Creative Diary APK
 on:
   push:
     branches: [main]
+    paths: ['app/**', '!app/src/main/assets/**', 'build.gradle', 'settings.gradle', 'gradle.properties', '.github/workflows/build.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,12 +18,17 @@ jobs:
       - name: Restore signing key
         env:
           KEY_B64: ${{ secrets.OZO_KEYSTORE_B64 }}
+          KEY_PASS: ${{ secrets.OZO_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEY_B64" ]; then echo "$KEY_B64" | base64 -d > "$RUNNER_TEMP/ozo.jks"; echo "OZO_KEYSTORE=$RUNNER_TEMP/ozo.jks" >> "$GITHUB_ENV"; fi
+          if [ -z "$KEY_B64" ] || [ -z "$KEY_PASS" ]; then gradle compileLiteReleaseJavaWithJavac compileFullReleaseJavaWithJavac --no-daemon; echo "::error::Code compiles, but the signing key is missing. Add the OZO_KEYSTORE_B64 and OZO_KEYSTORE_PASSWORD secrets. No APK published."; exit 1; fi
+          printf '%s' "$KEY_B64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/ozo.jks"
+          echo "OZO_KEYSTORE=$RUNNER_TEMP/ozo.jks" >> "$GITHUB_ENV"
       - name: Build APK
         env:
           OZO_KEYSTORE_PASSWORD: ${{ secrets.OZO_KEYSTORE_PASSWORD }}
-        run: gradle assembleRelease --no-daemon
+        run: |
+          export OZO_KEYSTORE_PASSWORD="$(printf '%s' "$OZO_KEYSTORE_PASSWORD" | tr -d ' \r\n')"
+          gradle assembleRelease --no-daemon
       - name: Publish download link
         env:
           GH_TOKEN: ${{ github.token }}

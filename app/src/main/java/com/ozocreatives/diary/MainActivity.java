@@ -10,6 +10,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     static final String HOME = "https://appassets.androidplatform.net/assets/index.html";
     static final int PICK = 41;
+    static final int TREE = 42;
     WebView web;
     ValueCallback<Uri[]> pending;
 
@@ -54,7 +56,15 @@ public class MainActivity extends Activity {
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         web.setWebViewClient(new WebViewClient() {
-            @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) { return loader.shouldInterceptRequest(r.getUrl()); }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
+                Uri u = r.getUrl();
+                if ("appassets.androidplatform.net".equals(u.getHost())) {
+                    String p = u.getPath() == null ? "" : u.getPath();
+                    if (p.equals("/assets/index.html") && r.isForMainFrame()) return PhoneStore.index(MainActivity.this);
+                    if (p.startsWith("/restore/")) return PhoneStore.serve(MainActivity.this, p.substring(9));
+                }
+                return loader.shouldInterceptRequest(u);
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
                 if ("appassets.androidplatform.net".equals(u.getHost())) return false;
@@ -135,6 +145,16 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onActivityResult(int req, int res, Intent data) {
+        if (req == TREE) {
+            final Uri tree = (res == RESULT_OK && data != null) ? data.getData() : null;
+            if (tree == null) { web.evaluateJavascript("window.ozoRestoreReady&&ozoRestoreReady(null)", null); return; }
+            try { getContentResolver().takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (Exception ignored) { }
+            new Thread(() -> {
+                final String json = PhoneStore.scan(MainActivity.this, tree);
+                runOnUiThread(() -> web.evaluateJavascript("window.ozoRestoreReady&&ozoRestoreReady(" + JSONObject.quote(json) + ")", null));
+            }).start();
+            return;
+        }
         if (req != PICK || pending == null) { super.onActivityResult(req, res, data); return; }
         Uri[] out = null;
         if (res == RESULT_OK) {
@@ -170,6 +190,20 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface public boolean isLite() { return BuildConfig.LITE; }
         @JavascriptInterface public int versionCode() { return BuildConfig.VERSION_CODE; }
+        @JavascriptInterface public String mirrorBegin(String rel, String name, String mime) { return PhoneStore.begin(MainActivity.this, rel, name, mime); }
+        @JavascriptInterface public boolean mirrorAppend(String tok, String b64) { return PhoneStore.append(tok, b64); }
+        @JavascriptInterface public boolean mirrorEnd(String tok, boolean ok) { return PhoneStore.end(MainActivity.this, tok, ok); }
+        @JavascriptInterface public boolean mirrorDelete(String rel, String name) { return PhoneStore.delete(MainActivity.this, rel, name); }
+        @JavascriptInterface public void pickRestoreFolder() {
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    try { i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/Ozo Diary")); } catch (Exception ignored) { }
+                }
+                try { startActivityForResult(i, TREE); }
+                catch (Exception e) { web.evaluateJavascript("window.ozoRestoreReady&&ozoRestoreReady(null)", null); }
+            });
+        }
         @JavascriptInterface public String getInbox() { return InboxStore.load(MainActivity.this).toString(); }
         @JavascriptInterface public boolean hasAccess() { return MainActivity.this.hasAccess(); }
         @JavascriptInterface public void markRead(String json) { try { InboxStore.markRead(MainActivity.this, new JSONObject(json)); } catch (Exception ignored) { } }
