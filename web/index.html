@@ -319,6 +319,9 @@ textarea.code{width:100%;min-height:140px;border:1px solid var(--edge2);backgrou
 /* v12: works colour, simple home cards, client video checklist */
 :root{--work:#c39bff;--work-soft:rgba(195,155,255,.12)}
 .item.work{border-left:3px solid var(--work);background:linear-gradient(90deg,var(--work-soft),var(--panel) 45%)}
+.wtag{display:inline-block;margin-right:7px;padding:1px 7px;border-radius:6px;background:var(--work);color:#170b2b;font-size:.66rem;font-weight:700;letter-spacing:.06em;vertical-align:2px}
+.item.done .wtag{background:var(--dim);color:#000}
+.wgrp{margin:14px 0 6px;font-size:.8rem;font-weight:600;color:var(--work);letter-spacing:.04em}.wgrp.late{color:var(--late)}
 .item.work.done{border-left-color:var(--dim);background:var(--panel)}
 .wdate{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;color:var(--work);border:1px solid rgba(195,155,255,.45);border-radius:999px;padding:1px 9px}
 .wdate.late{color:var(--late);border-color:rgba(255,93,108,.5)} .wdate.today{color:#fff;background:var(--work);border-color:var(--work);color:#140b22}
@@ -360,7 +363,7 @@ textarea.code{width:100%;min-height:140px;border:1px solid var(--edge2);backgrou
   <div class="glint" aria-hidden="true"><i></i></div>
   <div id="alarms" aria-live="polite"></div>
   <main id="view"></main>
-  <footer class="foot"><span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="foot-btn" data-go="backup">Backup &amp; restore</button><button class="foot-btn" data-checkupd="1" id="updBtn" hidden>Check for updates</button></span><img class="footlogo" alt="" width="36" height="36"><span>Ozo Creatives · Your creative partner in media, advertising &amp; events</span><span style="opacity:.45;font-size:11px">Build 09 Nov 2026 17:59</span></footer>
+  <footer class="foot"><span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="foot-btn" data-go="backup">Backup &amp; restore</button><button class="foot-btn" data-checkupd="1" id="updBtn" hidden>Check for updates</button></span><img class="footlogo" alt="" width="36" height="36"><span>Ozo Creatives · Your creative partner in media, advertising &amp; events</span><span style="opacity:.45;font-size:11px">Build 09 Nov 2026 18:02</span></footer>
   <p class="sync" id="sync"></p>
 </div>
 <button class="fab" id="fab" aria-label="Add new">+</button>
@@ -740,7 +743,7 @@ function row(i,hideClient){
   const cls=st==='done'?'on':st==='doing'?'mid':'';
   return '<div class="item'+(isV?'':' work')+(st==='done'?' done':'')+(late?' is-late':'')+'">'+
     '<button class="check '+cls+'" data-cycle="'+i.id+'" aria-label="'+(isV?(st==='done'?'Mark as not uploaded':'Mark as uploaded'):'Change status')+'"></button>'+
-    '<div class="body"><div class="t">'+esc(i.title)+'</div><div class="meta">'+p.join('')+'</div>'+
+    '<div class="body"><div class="t">'+(isV?'':'<span class="wtag">◆ WORK</span>')+esc(i.title)+'</div><div class="meta">'+p.join('')+'</div>'+
     (i.body?'<div class="note-line">'+esc(i.body.length>110?i.body.slice(0,110)+'…':i.body)+'</div>':'')+'</div>'+
     '<button class="more" data-open="'+i.id+'" aria-label="Edit">⋯</button></div>';
 }
@@ -808,8 +811,12 @@ function vHome(){
     card('c-pay','data-go="payments"','pay',rs(total(pd)),'Payment pending',pd.length?pd.length+' to collect'+(lateP?' · '+lateP+' late':''):'All received')+
     card('c-cl','data-go="clients"','clients',cs.length,'Clients','Videos, works & details')+
    '</div>'+
-   sec('Today',t.length)+(t.length?list(t.slice(0,8),''):'<div class="empty">Nothing for today. Tap + to add a work.</div>')+(t.length>8?'<button class="more-link" data-go="today">See all '+t.length+' ›</button>':'')+
-   sec('Works coming up',nextW.length)+(nextW.length?list(nextW.slice(0,5),''):'<div class="empty">No upcoming works. Tap + and choose Work, then give it a date.</div>')+(nextW.length?'<button class="more-link" data-tab="tasks">All works ›</button>':'')+
+   (function(){const ws=of('task').filter(i=>open(i)&&i.client!==ME).sort(byDue);const g={};ws.forEach(i=>{const k=!i.due?'~':i.due<today()?'0':i.due;(g[k]=g[k]||[]).push(i)});
+     const keys=Object.keys(g).sort();let shown=0,out='';
+     for(const k of keys){if(shown>=20)break;const arr=g[k].slice(0,20-shown);shown+=arr.length;
+       out+='<div class="wgrp'+(k==='0'?' late':'')+'">'+(k==='~'?'NO DATE':k==='0'?'OVERDUE':k===today()?'TODAY · '+dayDate(k).toUpperCase():k===addDays(1)?'TOMORROW · '+dayDate(k).toUpperCase():dayDate(k).toUpperCase())+'</div>'+list(arr,'')}
+     return sec('Works',ws.length)+(ws.length?out+(ws.length>shown?'<button class="more-link" data-tab="tasks">All '+ws.length+' works ›</button>':''):'<div class="empty">No works yet. Tap + → Work, type or 🎤 speak it, and pick the date.</div>')})()+
+   (function(){const tv=t.filter(isVid);return tv.length?sec('Videos today',tv.length)+list(tv.slice(0,8),'')+(tv.length>8?'<button class="more-link" data-go="today">See all ›</button>':''):''})()+
    '<div class="chips">'+
     (PHONE&&!LITE?'<button data-go="inbox">'+svg('inbox',16)+'Inbox'+(unread().length?' · '+unread().length:'')+'</button>':'')+
     '<button data-go="gallery">'+svg('gallery',16)+'Gallery</button><button data-go="files">'+svg('camera',16)+'Files</button><button data-go="people">'+svg('team',16)+'Team</button><button data-go="personal">'+svg('me',16)+'Personal</button><button data-go="backup">'+svg('diary',16)+'Backup</button>'+
