@@ -66,21 +66,55 @@ public class MainActivity extends Activity {
             @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
                 if (pending != null) pending.onReceiveValue(null);
                 pending = cb;
-                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-                i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("*/*");
+                java.util.ArrayList<String> mimes = new java.util.ArrayList<>();
+                boolean anyType = false;
                 String[] acc = p.getAcceptTypes();
-                boolean json = false;
-                if (acc != null) for (String a : acc) if (a != null && (a.contains("json") || a.endsWith(".json"))) json = true;
-                if (!json) i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
-                i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
-                try { startActivityForResult(Intent.createChooser(i, "Choose photos or videos"), PICK); }
-                catch (ActivityNotFoundException e) { pending = null; return false; }
+                if (acc != null) for (String a : acc) {
+                    if (a == null) continue;
+                    for (String part : a.split(",")) {
+                        String t = part.trim();
+                        if (t.isEmpty()) continue;
+                        if (t.startsWith("image/") || t.startsWith("video/")) mimes.add(t); else anyType = true;
+                    }
+                }
+                if (mimes.isEmpty()) anyType = true;
+                boolean images = anyType;
+                for (String m : mimes) if (m.startsWith("image/")) images = true;
+                Intent cam = images ? cameraIntent() : null;
+                try {
+                    if (p.isCaptureEnabled() && cam != null) { startActivityForResult(cam, PICK); return true; }
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    if (!anyType) i.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[0]));
+                    i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                    Intent chooser = Intent.createChooser(i, anyType ? "Choose a file" : "Choose photos or videos");
+                    if (cam != null) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cam});
+                    startActivityForResult(chooser, PICK);
+                } catch (ActivityNotFoundException e) { pending = null; return false; }
                 return true;
             }
         });
         web.addJavascriptInterface(new Bridge(), "OzoNative");
         if (b != null) web.restoreState(b); else web.loadUrl(HOME);
+    }
+
+    File cameraFile;
+    Uri cameraUri;
+
+    /** Camera intent that saves the photo into the app's cache, so it can be handed to the page. */
+    Intent cameraIntent() {
+        try {
+            File dir = new File(getCacheDir(), "camera"); dir.mkdirs();
+            String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(new java.util.Date());
+            cameraFile = new File(dir, "ozo-photo-" + stamp + ".jpg");
+            cameraUri = FileProvider.getUriForFile(this, "com.ozocreatives.diary.files", cameraFile);
+            Intent c = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            c.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
+            c.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            c.setClipData(ClipData.newRawUri("photo", cameraUri));
+            return c;
+        } catch (Exception e) { cameraFile = null; cameraUri = null; return null; }
     }
 
     void openExternal(String url) {
@@ -103,11 +137,18 @@ public class MainActivity extends Activity {
     @Override protected void onActivityResult(int req, int res, Intent data) {
         if (req != PICK || pending == null) { super.onActivityResult(req, res, data); return; }
         Uri[] out = null;
-        if (res == RESULT_OK && data != null) {
-            ClipData cd = data.getClipData();
-            if (cd != null) { out = new Uri[cd.getItemCount()]; for (int i = 0; i < cd.getItemCount(); i++) out[i] = cd.getItemAt(i).getUri(); }
-            else if (data.getData() != null) out = new Uri[]{data.getData()};
+        if (res == RESULT_OK) {
+            if (data != null) {
+                ClipData cd = data.getClipData();
+                if (cd != null && cd.getItemCount() > 0) { out = new Uri[cd.getItemCount()]; for (int i = 0; i < cd.getItemCount(); i++) out[i] = cd.getItemAt(i).getUri(); }
+                else if (data.getData() != null) out = new Uri[]{data.getData()};
+            }
+            if (cameraFile != null && cameraFile.exists() && cameraFile.length() > 0
+                    && (out == null || (out.length == 1 && cameraUri.equals(out[0])))) out = new Uri[]{cameraUri};
+            else if (out != null && out.length == 1 && cameraUri != null && cameraUri.equals(out[0])
+                    && (cameraFile == null || !cameraFile.exists() || cameraFile.length() == 0)) out = null;
         }
+        cameraFile = null;
         pending.onReceiveValue(out);
         pending = null;
     }
