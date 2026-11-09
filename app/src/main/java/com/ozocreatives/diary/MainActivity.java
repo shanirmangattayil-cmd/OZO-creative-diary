@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     static final String HOME = "https://appassets.androidplatform.net/assets/index.html";
     static final int PICK = 41;
     static final int TREE = 42;
+    static final int VOICE = 43;
     WebView web;
     ValueCallback<Uri[]> pending;
 
@@ -145,6 +146,15 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onActivityResult(int req, int res, Intent data) {
+        if (req == VOICE) {
+            String said = "";
+            if (res == RESULT_OK && data != null) {
+                java.util.ArrayList<String> r = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);
+                if (r != null && !r.isEmpty() && r.get(0) != null) said = r.get(0);
+            }
+            web.evaluateJavascript("window.ozoVoice&&ozoVoice(" + JSONObject.quote(said) + ")", null);
+            return;
+        }
         if (req == TREE) {
             final Uri tree = (res == RESULT_OK && data != null) ? data.getData() : null;
             if (tree == null) { web.evaluateJavascript("window.ozoRestoreReady&&ozoRestoreReady(null)", null); return; }
@@ -194,6 +204,19 @@ public class MainActivity extends Activity {
         @JavascriptInterface public boolean mirrorAppend(String tok, String b64) { return PhoneStore.append(tok, b64); }
         @JavascriptInterface public boolean mirrorEnd(String tok, boolean ok) { return PhoneStore.end(MainActivity.this, tok, ok); }
         @JavascriptInterface public boolean mirrorDelete(String rel, String name) { return PhoneStore.delete(MainActivity.this, rel, name); }
+        @JavascriptInterface public boolean voice(String lang) {
+            runOnUiThread(() -> {
+                Intent i = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                String l = (lang == null || lang.isEmpty()) ? "ml-IN" : lang;
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, l);
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, l);
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, l.startsWith("ml") ? "പറയൂ…" : "Speak now…");
+                try { startActivityForResult(i, VOICE); }
+                catch (Exception e) { web.evaluateJavascript("window.ozoVoice&&ozoVoice(null)", null); }
+            });
+            return true;
+        }
         @JavascriptInterface public void pickRestoreFolder() {
             runOnUiThread(() -> {
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
