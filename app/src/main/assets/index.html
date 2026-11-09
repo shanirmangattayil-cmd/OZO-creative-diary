@@ -344,7 +344,7 @@ textarea.code{width:100%;min-height:140px;border:1px solid var(--edge2);backgrou
   <div class="glint" aria-hidden="true"><i></i></div>
   <div id="alarms" aria-live="polite"></div>
   <main id="view"></main>
-  <footer class="foot"><span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="foot-btn" data-go="backup">Backup &amp; restore</button><button class="foot-btn" data-checkupd="1" id="updBtn" hidden>Check for updates</button></span><img class="footlogo" alt="" width="36" height="36"><span>Ozo Creatives · Your creative partner in media, advertising &amp; events</span><span style="opacity:.45;font-size:11px">Build 09 Nov 2026 17:58</span></footer>
+  <footer class="foot"><span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="foot-btn" data-go="backup">Backup &amp; restore</button><button class="foot-btn" data-checkupd="1" id="updBtn" hidden>Check for updates</button></span><img class="footlogo" alt="" width="36" height="36"><span>Ozo Creatives · Your creative partner in media, advertising &amp; events</span><span style="opacity:.45;font-size:11px">Build 09 Nov 2026 17:59</span></footer>
   <p class="sync" id="sync"></p>
 </div>
 <button class="fab" id="fab" aria-label="Add new">+</button>
@@ -431,7 +431,7 @@ async function checkUpdate(manual){
     try{localStorage.setItem('ozo-upd-check',String(Date.now()))}catch(_){}
     upd={state:v>mine&&a?'available':'current',latest:v,url:a?a.browser_download_url:'',msg:''};
   }catch(e){upd={state:'error',latest:0,url:'',msg:manual?'Could not check for updates. Check your internet and try again.':''}}
-  render();if(manual&&upd.state==='current')toast('You have the latest version');
+  render();if(manual&&upd.state==='current'){toast('Getting the latest version…');setTimeout(()=>location.reload(),700)}
 }
 const WEB=APP&&!!(window.OzoNative.isWeb&&window.OzoNative.isWeb());
 const LITE=APP&&!!(window.OzoNative.isLite&&window.OzoNative.isLite());
@@ -988,7 +988,7 @@ function vDiary(){
 function tabOf(v){if(['people','inbox','backup','gallery','files','today','tomup','tomorrow','uploads'].includes(v))return'home';if(v==='personal')return'tasks';if(['editing','final','notup','edits'].includes(v))return'clients';if(v.startsWith('client'))return'clients';return v}
 function render(){
   const cur=tabOf(state.view);
-  const ub=document.getElementById('updBtn');if(ub&&APP&&!WEB){ub.hidden=false;const vc=OzoNative.versionCode?OzoNative.versionCode():0;ub.textContent=upd.state==='checking'?'Checking…':upd.state==='available'?'Update to v'+upd.latest:'Check for updates · v'+vc;if(upd.state==='available')ub.dataset.update='1';else delete ub.dataset.update}
+  const ub=document.getElementById('updBtn');if(ub&&APP&&!WEB){ub.hidden=false;const vc=OzoNative.versionCode?OzoNative.versionCode():0;ub.textContent=upd.state==='checking'?'Checking…':upd.state==='available'?'Update to v'+upd.latest:'Update app · v'+vc;if(upd.state==='available')ub.dataset.update='1';else delete ub.dataset.update}
   if(upd.msg&&upd.state!=='checking'){const m=upd.msg;upd.msg='';setTimeout(()=>toast(m),50)}
   $('#tabs').innerHTML=TABS.map(([k,l])=>'<button data-tab="'+k+'"'+(k===cur?' aria-current="page"':'')+'>'+svg(k==='payments'?'pay':k,22)+l+'</button>').join('');
   checkAlarms();
